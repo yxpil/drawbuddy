@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DrawBuddy · 万能绘图工作台</title>
+<script src="assets/tailwind.js"></script>
+<style>
+  :root {
+    --bg: #0e1016;
+    --bg-panel: #161923;
+    --bg-card: #1d212e;
+    --border: #2b3040;
+    --text: #e6eaf2;
+    --text-dim: #8b93a5;
+    --accent: #5b8dff;
+    --accent-2: #a76cff;
+    --accent-soft: rgba(91, 141, 255, .13);
+    --danger: #ff5c6c;
+    --ok: #3ecf8e;
+    --shadow: 0 8px 30px rgba(0, 0, 0, .35);
+  }
+  html[data-theme="light"] {
+    --bg: #f2f4f8;
+    --bg-panel: #ffffff;
+    --bg-card: #edf0f6;
+    --border: #dce1ec;
+    --text: #1b2231;
+    --text-dim: #6b7488;
+    --accent: #2f6bff;
+    --accent-2: #8b4cf0;
+    --accent-soft: rgba(47, 107, 255, .09);
+    --danger: #e5484d;
+    --ok: #2f9e63;
+    --shadow: 0 8px 30px rgba(30, 40, 70, .12);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  svg { display: inline-block; }
+
+  /* ===== 组件类 ===== */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    padding: 7px 14px; border-radius: 9px; font-size: 13px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-card); color: var(--text);
+    transition: all .15s ease;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border-color: transparent; color: #fff;
+    box-shadow: 0 3px 14px rgba(91, 141, 255, .35);
+  }
+  .btn.primary:hover { filter: brightness(1.12); color: #fff; }
+  .btn.icon-only { padding: 7px 9px; }
+
+  .mode-tabs { display: flex; gap: 2px; background: var(--bg-card); padding: 3px; border-radius: 11px; border: 1px solid var(--border); }
+  .mode-tabs button {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: none; background: transparent; color: var(--text-dim);
+    padding: 7px 15px; border-radius: 8px; cursor: pointer; font-size: 13px; white-space: nowrap;
+    transition: all .15s;
+  }
+  .mode-tabs button:hover { color: var(--text); }
+  .mode-tabs button.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; }
+
+  .tpl-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 11px; border-radius: 9px; cursor: pointer; font-size: 13px;
+    color: var(--text); border: 1px solid transparent; transition: all .12s;
+  }
+  .tpl-item:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .tpl-item.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .tpl-item svg { color: var(--text-dim); flex-shrink: 0; }
+  .tpl-item:hover svg, .tpl-item.active svg { color: inherit; }
+
+  .side-h {
+    font-size: 11px; color: var(--text-dim); letter-spacing: 2px;
+    margin: 12px 6px 3px; font-weight: 700;
+  }
+
+  .field label { font-size: 12px; color: var(--text-dim); font-weight: 600; }
+  .field input[type=text], .field select {
+    width: 100%; background: var(--bg-card); border: 1px solid var(--border); color: var(--text);
+    padding: 8px 11px; border-radius: 9px; font-size: 13px; outline: none; transition: border-color .15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+
+  .ctype {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 4px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-card); cursor: pointer; font-size: 12px; color: var(--text); transition: all .12s;
+  }
+  .ctype svg { color: var(--text-dim); }
+  .ctype:hover { border-color: var(--accent); }
+  .ctype.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .ctype.active svg { color: var(--accent); }
+
+  .gen-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px; transition: border-color .15s;
+  }
+  .gen-card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .gen-card textarea, textarea.json, .gen-row input[type=text] {
+    width: 100%; background: var(--bg-panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 9px; outline: none; transition: border-color .15s; resize: vertical;
+  }
+  .gen-card textarea:focus, textarea.json:focus, .gen-row input:focus { border-color: var(--accent); }
+
+  textarea.code {
+    flex: 1; width: 100%; resize: none; border: none; outline: none;
+    background: var(--bg-panel); color: var(--text);
+    font-family: Consolas, "Cascadia Code", Menlo, monospace;
+    font-size: 13.5px; line-height: 1.7; padding: 14px; tab-size: 4;
+  }
+
+  .pane-head {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+    padding: 9px 14px; border-bottom: 1px solid var(--border);
+    background: var(--bg-panel); font-size: 12px; color: var(--text-dim);
+  }
+
+  /* 预览区棋盘格 */
+  .preview-scroll {
+    flex: 1; overflow: auto; position: relative;
+    background:
+      linear-gradient(45deg, var(--bg-card) 25%, transparent 25%) -16px 0/32px 32px,
+      linear-gradient(-45deg, var(--bg-card) 25%, transparent 25%) -16px 0/32px 32px,
+      linear-gradient(45deg, transparent 75%, var(--bg-card) 75%) 0 0/32px 32px,
+      linear-gradient(-45deg, transparent 75%, var(--bg-card) 75%) 0 0/32px 32px,
+      var(--bg);
+  }
+  #preview-wrap { position: absolute; top: 0; left: 0; transform-origin: 0 0; padding: 24px; display: inline-block; }
+  #preview-wrap svg, #preview-wrap .chart-host canvas { background: var(--bg-panel); border-radius: 12px; box-shadow: var(--shadow); }
+
+  .err-box {
+    margin: 12px; padding: 12px 14px; background: rgba(255, 92, 108, .12);
+    border: 1px solid var(--danger); border-radius: 10px; color: var(--danger);
+    font-size: 13px; font-family: Consolas, monospace; white-space: pre-wrap;
+    position: absolute; top: 0; left: 0; right: 0; z-index: 6;
+  }
+
+  #toast {
+    position: fixed; top: 64px; left: 50%; transform: translateX(-50%) translateY(-8px);
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg-panel); color: var(--text); border: 1px solid var(--border);
+    padding: 9px 18px; border-radius: 10px; font-size: 13px; opacity: 0;
+    pointer-events: none; transition: all .25s; z-index: 99; box-shadow: var(--shadow);
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #toast svg { color: var(--ok); }
+
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ===== SVG 图标库 ===== -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <defs>
+    <symbol id="i-flow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="7" y="2.5" width="10" height="5" rx="1.2"/><rect x="7" y="16.5" width="10" height="5" rx="1.2"/>
+      <path d="M12 7.5v7"/><path d="M9.4 12l2.6 3 2.6-3"/>
+    </symbol>
+    <symbol id="i-flow-h" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1.5" y="9" width="6.5" height="6" rx="1.2"/><rect x="16" y="9" width="6.5" height="6" rx="1.2"/>
+      <path d="M8 12h7"/><path d="M12.8 9.6L15.2 12l-2.4 2.4"/>
+    </symbol>
+    <symbol id="i-seq" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 3v18M19 3v18"/><path d="M5 8.5h11"/><path d="M13.8 6.2 16.2 8.5l-2.4 2.3"/>
+      <path d="M19 15.5H8"/><path d="M10.2 13.2 7.8 15.5l2.4 2.3"/>
+    </symbol>
+    <symbol id="i-class" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="3" width="16" height="18" rx="1.6"/><path d="M4 8.5h16M4 14h16"/>
+    </symbol>
+    <symbol id="i-state" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6.2" cy="12" r="3"/><rect x="12.5" y="7" width="8.5" height="10" rx="4.2"/><path d="M9.2 12h3.3"/>
+    </symbol>
+    <symbol id="i-er" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3.5" width="8" height="7" rx="1.2"/><rect x="13" y="13.5" width="8" height="7" rx="1.2"/><path d="M11 7h6.5v6.5"/>
+    </symbol>
+    <symbol id="i-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="8" height="8" rx="1.4"/><rect x="13" y="3" width="8" height="8" rx="1.4"/>
+      <rect x="3" y="13" width="8" height="8" rx="1.4"/><rect x="13" y="13" width="8" height="8" rx="1.4"/>
+    </symbol>
+    <symbol id="i-mind" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.2"/>
+      <circle cx="4.5" cy="5" r="1.8"/><circle cx="19.5" cy="5" r="1.8"/><circle cx="4.5" cy="19" r="1.8"/><circle cx="19.5" cy="19" r="1.8"/>
+      <path d="M6 6.3 9.8 10M18 6.3 14.2 10M6 17.7 9.8 14M18 17.7 14.2 14"/>
+    </symbol>
+    <symbol id="i-timeline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12h18"/><circle cx="7" cy="12" r="2"/><circle cx="13" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
+      <path d="M7 8V5.5M13 16v2.5M19 8V5.5"/>
+    </symbol>
+    <symbol id="i-gantt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="4.5" width="13" height="3.2" rx="1.2"/><rect x="7" y="10.4" width="13" height="3.2" rx="1.2"/><rect x="5.5" y="16.3" width="10" height="3.2" rx="1.2"/>
+    </symbol>
+    <symbol id="i-journey" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 19c2.5-8 5.5-8 8-4s5.5 4 10-6"/><path d="M18 3v6"/><path d="M18 3.5 21.5 5 18 6.5"/>
+    </symbol>
+    <symbol id="i-git" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="12" r="2"/>
+      <path d="M6 7v10"/><path d="M8 5.2c6 0 4.5 5.2 8 5.8"/><path d="M16 13c-3.5.6-2 5.8-8 5.8"/>
+    </symbol>
+    <symbol id="i-pie" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/>
+    </symbol>
+    <symbol id="i-quadrant" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="1.8"/><path d="M12 3v18M3 12h18"/>
+      <circle cx="7.5" cy="7.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="7.5" r="1.1" fill="currentColor" stroke="none"/>
+      <circle cx="7.5" cy="16.5" r="1.1" fill="currentColor" stroke="none"/><circle cx="16.5" cy="16.5" r="1.1" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-xy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4v16h16"/><path d="M7 15.5l4-5 3 3 5.5-7"/>
+    </symbol>
+    <symbol id="i-sankey" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 4.5c7 0 7 5 14 5h4"/><path d="M3 19.5c7 0 7-9 14-9h4"/><path d="M3 12h6"/>
+    </symbol>
+    <symbol id="i-req" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h3.5"/>
+    </symbol>
+    <symbol id="i-note" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M17 3.5l3.5 3.5L8 19.5 3.5 20.5 4.5 16z"/>
+    </symbol>
+    <symbol id="i-bar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 20h18"/><path d="M7 20v-8M12 20V5M17 20v-11"/>
+    </symbol>
+    <symbol id="i-bar-h" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4v16"/><path d="M12 7H20M8 12h12M13 17h7" transform="translate(-2 0)"/>
+    </symbol>
+    <symbol id="i-line" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 4v16h18"/><path d="M6 15.5l4.5-5.5 3.5 3L20 6"/>
+    </symbol>
+    <symbol id="i-area" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 4v16h18"/><path d="M6 15.5l4.5-5.5 3.5 3L20 6v11H6z" fill="currentColor" fill-opacity=".16"/>
+    </symbol>
+    <symbol id="i-doughnut" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.4"/>
+    </symbol>
+    <symbol id="i-radar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2.5 21.5 9.5 18 21H6L2.5 9.5z"/><path d="M12 8.5 16.5 12l-1.8 5h-5.4L7.5 12z"/>
+    </symbol>
+    <symbol id="i-scatter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 4v16h16"/>
+      <circle cx="9" cy="9" r="1.4" fill="currentColor" stroke="none"/><circle cx="13.5" cy="14" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="17" cy="7" r="1.4" fill="currentColor" stroke="none"/><circle cx="8" cy="16" r="1.4" fill="currentColor" stroke="none"/>
+      <circle cx="16" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+    </symbol>
+    <symbol id="i-polar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="8.5"/><path d="M12 12 12 3.5M12 12l7.4 4.2M12 12l-7.4 4.2"/>
+    </symbol>
+    <symbol id="i-wand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8 19 13M17.8 6.2 19 5M12.2 6.2 11 5M3 21l9-9"/>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </symbol>
+    <symbol id="i-save" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>
+    </symbol>
+    <symbol id="i-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+    </symbol>
+    <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>
+    </symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/>
+    </symbol>
+    <symbol id="i-zoom-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>
+    </symbol>
+    <symbol id="i-zoom-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35M8 11h6"/>
+    </symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+    </symbol>
+    <symbol id="i-target" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/>
+    </symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M23 4v6h-6"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+    </symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 6L9 17l-5-5"/>
+    </symbol>
+  </defs>
+</svg>
+
+<!-- ===== 顶栏 ===== -->
+<header class="z-10 flex h-14 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--bg-panel)] px-4">
+  <div class="flex items-center gap-2.5">
+    <div class="flex h-8 w-8 items-center justify-center rounded-[9px] text-white" style="background:linear-gradient(135deg,var(--accent),var(--accent-2))">
+      <svg class="h-[18px] w-[18px]"><use href="#i-flow"/></svg>
+    </div>
+    <div class="leading-tight">
+      <div class="text-[15px] font-bold tracking-wide">DrawBuddy</div>
+      <div class="text-[10px] text-[var(--text-dim)]">万能绘图工作台</div>
+    </div>
+  </div>
+
+  <div class="mode-tabs" id="modeTabs">
+    <button data-mode="diagram" class="active"><svg class="h-4 w-4"><use href="#i-flow"/></svg>图表绘制</button>
+    <button data-mode="chart"><svg class="h-4 w-4"><use href="#i-bar"/></svg>统计图表</button>
+    <button data-mode="gen"><svg class="h-4 w-4"><use href="#i-wand"/></svg>快速生成</button>
+  </div>
+
+  <div class="flex-1"></div>
+
+  <span id="statusBadge" class="hidden items-center gap-1.5 rounded-full border border-[var(--ok)] px-2.5 py-1 text-xs text-[var(--ok)]">
+    <svg class="h-3.5 w-3.5"><use href="#i-check"/></svg>已渲染
+  </span>
+
+  <button class="btn icon-only" id="btnTheme" title="切换深浅主题"><svg class="h-4 w-4"><use href="#i-moon"/></svg></button>
+  <button class="btn" id="btnSave" title="保存草稿到本地 (Ctrl+S)"><svg class="h-4 w-4"><use href="#i-save"/></svg>保存草稿</button>
+  <button class="btn primary" id="btnMd" title="导出为 Markdown 文档，Mermaid 代码块在 GitHub 等平台可原生渲染"><svg class="h-4 w-4"><use href="#i-doc"/></svg>导出 README</button>
+  <button class="btn primary" id="btnPng"><svg class="h-4 w-4"><use href="#i-image"/></svg>导出 PNG</button>
+  <button class="btn" id="btnSvg" title="导出矢量图"><svg class="h-4 w-4"><use href="#i-code"/></svg>SVG</button>
+</header>
+
+<main class="flex min-h-0 flex-1">
+  <!-- 侧栏 -->
+  <div class="sidebar flex w-56 shrink-0 flex-col gap-1.5 overflow-y-auto border-r border-[var(--border)] bg-[var(--bg-panel)] p-3" id="sidebar"></div>
+
+  <!-- 工作区 -->
+  <div class="flex min-w-0 flex-1">
+    <div class="editor-pane flex w-[38%] min-w-0 flex-col border-r border-[var(--border)]">
+      <div class="pane-head">
+        <span class="font-semibold text-[var(--text)]" id="editorTitle">Mermaid 代码</span>
+        <span class="flex-1"></span>
+        <button class="btn icon-only" id="btnFormat" style="padding:4px 8px;font-size:12px" title="重置为当前模板原始代码">
+          <svg class="h-3.5 w-3.5"><use href="#i-refresh"/></svg>
+        </button>
+      </div>
+
+      <!-- 图表代码编辑器 -->
+      <textarea class="code" id="codeEditor" spellcheck="false"></textarea>
+
+      <!-- 统计图表表单 -->
+      <div class="chart-form hidden flex-1 flex-col gap-4 overflow-y-auto p-4" id="chartForm">
+        <div class="field">
+          <label class="mb-1.5 block">图表类型</label>
+          <div class="grid grid-cols-3 gap-1.5" id="chartTypeGrid"></div>
+        </div>
+        <div class="field">
+          <label class="mb-1.5 block">图表标题</label>
+          <input type="text" id="chartTitle" placeholder="请输入标题（可留空）">
+        </div>
+        <div class="field">
+          <label class="mb-1.5 block">数据（JSON，labels 为横轴/分类，datasets 为系列）</label>
+          <textarea class="json min-h-[220px] p-2.5 font-mono text-[12.5px] leading-relaxed" id="chartData" spellcheck="false"></textarea>
+          <div class="mt-1.5 text-[11.5px] leading-relaxed text-[var(--text-dim)]">提示：修改数据后自动刷新预览；点击右上「导出 PNG」即可保存成图片。</div>
+        </div>
+        <button class="btn primary self-start" id="btnChartPreset"><svg class="h-4 w-4"><use href="#i-refresh"/></svg>载入示例数据</button>
+      </div>
+
+      <!-- 快速生成表单 -->
+      <div class="gen-forms hidden flex-1 flex-col gap-4 overflow-y-auto p-4" id="genForms">
+        <div class="gen-card">
+          <h3 class="mb-1 flex items-center gap-2 text-sm font-semibold"><svg class="h-4 w-4 text-[var(--accent)]"><use href="#i-flow"/></svg>步骤 → 流程图</h3>
+          <p class="mb-2.5 text-xs leading-relaxed text-[var(--text-dim)]">每行写一个步骤，自动生成纵向流程图。行首用 <code class="rounded bg-[var(--bg-panel)] px-1 py-0.5 text-[11px]">#</code> 表示判断（菱形），其后用两个空格缩进的行表示该判断的分支。</p>
+          <textarea class="min-h-[90px] p-2.5 text-[13px] leading-relaxed" id="genSteps" spellcheck="false">开始下单
+检查库存
+# 库存充足
+  生成订单
+  发起支付
+# 库存不足
+  提示缺货
+  结束</textarea>
+          <div class="mt-2.5 flex items-center gap-2"><button class="btn primary" id="btnGenFlow"><svg class="h-4 w-4"><use href="#i-wand"/></svg>生成流程图</button></div>
+        </div>
+
+        <div class="gen-card">
+          <h3 class="mb-1 flex items-center gap-2 text-sm font-semibold"><svg class="h-4 w-4 text-[var(--accent)]"><use href="#i-mind"/></svg>大纲 → 思维导图</h3>
+          <p class="mb-2.5 text-xs leading-relaxed text-[var(--text-dim)]">第一行为中心主题，之后按缩进（2 空格 / Tab）表示层级。</p>
+          <textarea class="min-h-[90px] p-2.5 text-[13px] leading-relaxed" id="genMind" spellcheck="false">产品发布会
+  筹备工作
+    场地与物料
+    邀请嘉宾
+  宣传推广
+    社交媒体
+    新闻稿
+  现场执行
+    签到接待
+    演示环节</textarea>
+          <div class="mt-2.5 flex items-center gap-2">
+            <input type="text" id="mindShape" value="圆角" placeholder="主题形状" class="flex-1 border border-[var(--border)] bg-[var(--bg-panel)] px-2.5 py-2 text-[13px] text-[var(--text)] outline-none rounded-[9px] focus:border-[var(--accent)]">
+            <button class="btn primary" id="btnGenMind"><svg class="h-4 w-4"><use href="#i-wand"/></svg>生成思维导图</button>
+          </div>
+          <div class="mt-1.5 text-[11.5px] text-[var(--text-dim)]">主题形状可选：圆角 / 方形 / 圆形 / 云朵</div>
+        </div>
+
+        <div class="gen-card">
+          <h3 class="mb-1 flex items-center gap-2 text-sm font-semibold"><svg class="h-4 w-4 text-[var(--accent)]"><use href="#i-timeline"/></svg>时间 → 时间线</h3>
+          <p class="mb-2.5 text-xs leading-relaxed text-[var(--text-dim)]">每行格式：<code class="rounded bg-[var(--bg-panel)] px-1 py-0.5 text-[11px]">时间 : 事件1 : 事件2</code>（用英文冒号分隔）。</p>
+          <textarea class="min-h-[90px] p-2.5 text-[13px] leading-relaxed" id="genTime" spellcheck="false">2026 Q1 : 需求调研 : 竞品分析
+2026 Q2 : 产品设计 : 原型评审
+2026 Q3 : 开发迭代 : 内测
+2026 Q4 : 正式发布 : 运营推广</textarea>
+          <div class="mt-2.5 flex items-center gap-2"><button class="btn primary" id="btnGenTime"><svg class="h-4 w-4"><use href="#i-wand"/></svg>生成时间线</button></div>
+        </div>
+
+        <div class="gen-card">
+          <h3 class="mb-1 flex items-center gap-2 text-sm font-semibold"><svg class="h-4 w-4 text-[var(--accent)]"><use href="#i-seq"/></svg>角色 → 时序图</h3>
+          <p class="mb-2.5 text-xs leading-relaxed text-[var(--text-dim)]">每行格式：<code class="rounded bg-[var(--bg-panel)] px-1 py-0.5 text-[11px]">甲 -&gt;&gt; 乙 : 消息</code>，也支持虚线箭头；首行可用 <code class="rounded bg-[var(--bg-panel)] px-1 py-0.5 text-[11px]">participant 名称</code> 声明角色。</p>
+          <textarea class="min-h-[90px] p-2.5 text-[13px] leading-relaxed" id="genSeq" spellcheck="false">用户 -&gt;&gt; 前端 : 点击登录
+前端 -&gt;&gt; 服务端 : 请求鉴权
+服务端 --&gt;&gt; 前端 : 返回 Token
+前端 --&gt;&gt; 用户 : 登录成功</textarea>
+          <div class="mt-2.5 flex items-center gap-2"><button class="btn primary" id="btnGenSeq"><svg class="h-4 w-4"><use href="#i-wand"/></svg>生成时序图</button></div>
+        </div>
+
+        <div class="gen-card">
+          <h3 class="mb-1 flex items-center gap-2 text-sm font-semibold"><svg class="h-4 w-4 text-[var(--accent)]"><use href="#i-pie"/></svg>数据 → 统计饼图</h3>
+          <p class="mb-2.5 text-xs leading-relaxed text-[var(--text-dim)]">每行格式：<code class="rounded bg-[var(--bg-panel)] px-1 py-0.5 text-[11px]">名称 : 数值</code>。</p>
+          <textarea class="min-h-[90px] p-2.5 text-[13px] leading-relaxed" id="genPie" spellcheck="false">已完成 : 42
+进行中 : 18
+待开始 : 25
+已延期 : 8</textarea>
+          <div class="mt-2.5 flex items-center gap-2"><button class="btn primary" id="btnGenPie"><svg class="h-4 w-4"><use href="#i-wand"/></svg>生成饼图</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 预览区 -->
+    <div class="relative flex min-w-0 flex-1 flex-col">
+      <div class="pane-head">
+        <span class="font-semibold text-[var(--text)]">预览</span>
+        <span class="flex-1"></span>
+        <span id="renderInfo"></span>
+      </div>
+      <div class="preview-scroll" id="previewScroll">
+        <div id="preview-wrap"></div>
+        <div class="err-box hidden" id="errBox"></div>
+      </div>
+      <div class="absolute bottom-3.5 right-3.5 z-[5] flex gap-1.5">
+        <button class="btn icon-only" id="zoomIn" title="放大 (Ctrl+滚轮)"><svg class="h-4 w-4"><use href="#i-zoom-in"/></svg></button>
+        <button class="btn icon-only" id="zoomOut" title="缩小"><svg class="h-4 w-4"><use href="#i-zoom-out"/></svg></button>
+        <button class="btn icon-only" id="zoomFit" title="适应窗口"><svg class="h-4 w-4"><use href="#i-fit"/></svg></button>
+        <button class="btn icon-only" id="zoomReset" title="原始大小 1:1"><svg class="h-4 w-4"><use href="#i-target"/></svg></button>
+      </div>
+      <div id="zoom-label" class="absolute bottom-4 left-3.5 z-[5] rounded-md border border-[var(--border)] bg-[var(--bg-panel)] px-2.5 py-1 text-xs text-[var(--text-dim)]">100%</div>
+    </div>
+  </div>
+</main>
+
+<div id="toast"><svg class="h-4 w-4"><use href="#i-check"/></svg><span id="toastText"></span></div>
+
+<script src="assets/mermaid.min.js"></script>
+<script src="assets/chart.umd.min.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   DrawBuddy · 本地万能绘图工作台
+   模式一 diagram：Mermaid 全家桶
+   模式二 chart ：Chart.js 统计图表
+   模式三 gen   ：无语法门槛的快速生成器
+   ============================================================ */
+
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+
+/* ---------- 状态 ---------- */
+const state = {
+  mode: "diagram",
+  tplId: "flowTD",
+  chartType: "bar",
+  zoom: 1,
+  panX: 0, panY: 0,
+  theme: localStorage.getItem("db_theme") || "dark",
+  lastSvg: null,
+};
+document.documentElement.dataset.theme = state.theme;
+
+/* ---------- 模板库 ---------- */
+const TEMPLATES = [
+  { group: "流程与结构", items: [
+    { id: "flowTD", name: "流程图（纵向）", ico: "i-flow", code:
+`flowchart TD
+    A[开始] --> B{是否登录?}
+    B -- 是 --> C[进入首页]
+    B -- 否 --> D[跳转登录页]
+    D --> E[输入账号密码]
+    E --> F[校验通过?]
+    F -- 通过 --> C
+    F -- 失败 --> D
+    C --> G[结束]` },
+    { id: "flowLR", name: "流程图（横向）", ico: "i-flow-h", code:
+`flowchart LR
+    A[需求] --> B[设计]
+    B --> C[开发]
+    C --> D{测试通过?}
+    D -- 是 --> E[上线]
+    D -- 否 --> C` },
+    { id: "seq", name: "时序图", ico: "i-seq", code:
+`sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant F as 前端
+    participant S as 服务端
+    participant D as 数据库
+    U->>F: 提交订单
+    F->>S: 创建订单请求
+    S->>D: 写入订单
+    D-->>S: 写入成功
+    S-->>F: 返回订单号
+    F-->>U: 显示下单成功` },
+    { id: "class", name: "类图", ico: "i-class", code:
+`classDiagram
+    class Animal {
+        +String name
+        +int age
+        +makeSound() String
+    }
+    class Dog {
+        +fetch()
+    }
+    class Cat {
+        +climb()
+    }
+    Animal <|-- Dog
+    Animal <|-- Cat
+    Animal : +int legs` },
+    { id: "state", name: "状态图", ico: "i-state", code:
+`stateDiagram-v2
+    [*] --> 待支付
+    待支付 --> 已支付 : 支付成功
+    待支付 --> 已取消 : 超时未付
+    已支付 --> 发货中 : 商家发货
+    发货中 --> 已签收 : 确认收货
+    已签收 --> [*]
+    已取消 --> [*]` },
+    { id: "er", name: "ER 图（数据库）", ico: "i-er", code:
+`erDiagram
+    USER ||--o{ ORDER : 下单
+    ORDER ||--|{ ORDER_ITEM : 包含
+    PRODUCT ||--o{ ORDER_ITEM : 被购买
+
+    USER {
+        int id PK
+        string name
+        string email
+    }
+    ORDER {
+        int id PK
+        int user_id FK
+        datetime created_at
+    }
+    PRODUCT {
+        int id PK
+        string title
+        float price
+    }` },
+    { id: "block", name: "架构方块图", ico: "i-block", code:
+`block-beta
+  columns 3
+  Client["浏览器客户端"] Cloud["云端服务"] DB[("数据库")]
+  Client --> Cloud
+  Cloud --> DB
+  space:3
+  style Client fill:#4f8cff,color:#fff
+  style Cloud fill:#b06cff,color:#fff
+  style DB fill:#3ecf8e,color:#04331f` },
+  ]},
+  { group: "计划与梳理", items: [
+    { id: "mind", name: "思维导图", ico: "i-mind", code:
+`mindmap
+  root((项目规划))
+    市场调研
+      用户访谈
+      竞品分析
+    产品设计
+      原型
+        低保真
+        高保真
+      需求文档
+    开发上线
+      前端
+      后端
+      测试` },
+    { id: "timeline", name: "时间线 / 步骤", ico: "i-timeline", code:
+`timeline
+    title 产品发布历程
+    2026 Q1 : 需求调研 : 团队组建
+    2026 Q2 : 产品定型 : 原型评审
+    2026 Q3 : 开发内测 : 压力测试
+    2026 Q4 : 正式发布 : 全渠道推广` },
+    { id: "gantt", name: "甘特图", ico: "i-gantt", code:
+`gantt
+    title 项目排期
+    dateFormat  YYYY-MM-DD
+    axisFormat  %m-%d
+    section 需求阶段
+    需求调研       :a1, 2026-10-01, 10d
+    需求评审       :a2, after a1, 5d
+    section 开发阶段
+    概要设计       :b1, after a2, 7d
+    编码实现       :b2, after b1, 20d
+    section 测试上线
+    集成测试       :c1, after b2, 10d
+    发布上线       :milestone, after c1, 0d` },
+    { id: "journey", name: "用户旅程图", ico: "i-journey", code:
+`journey
+    title 网购用户旅程
+    section 浏览
+      打开商城: 5: 用户
+      搜索商品: 4: 用户
+    section 下单
+      加购物车: 5: 用户
+      提交订单: 3: 用户, 商家
+    section 售后
+      确认收货: 4: 用户
+      发表评价: 2: 用户` },
+    { id: "git", name: "Git 分支图", ico: "i-git", code:
+`gitGraph
+    commit id: "init"
+    branch develop
+    commit id: "feature-A"
+    branch feature-b
+    commit id: "feature-B"
+    checkout develop
+    merge feature-b
+    checkout main
+    merge develop tag: "v1.0.0"` },
+  ]},
+  { group: "数据与决策", items: [
+    { id: "pie", name: "饼图（Mermaid）", ico: "i-pie", code:
+`pie showData
+    title 任务分布
+    "已完成" : 42
+    "进行中" : 18
+    "待开始" : 25
+    "已延期" : 8` },
+    { id: "quadrant", name: "象限图", ico: "i-quadrant", code:
+`quadrantChart
+    title "需求优先级评估"
+    x-axis "紧急" --> "不紧急"
+    y-axis "重要" --> "不重要"
+    quadrant-1 "立即做"
+    quadrant-2 "计划做"
+    quadrant-3 "尽量少做"
+    quadrant-4 "委托他人"
+    "登录功能": [0.85, 0.9]
+    "主题皮肤": [0.2, 0.3]
+    "性能优化": [0.6, 0.8]
+    "动画效果": [0.15, 0.15]` },
+    { id: "xy", name: "XY 折线/柱状", ico: "i-xy", code:
+`xychart-beta
+    title "月度销售额（万元）"
+    x-axis ["1月", "2月", "3月", "4月", "5月", "6月"]
+    y-axis "金额" 0 --> 120
+    bar [32, 48, 41, 66, 78, 95]
+    line [30, 45, 44, 60, 75, 92]` },
+    { id: "sankey", name: "桑基图（流向）", ico: "i-sankey", code:
+`%% 桑基图暂不支持中文，请用英文标签（格式: 源,目标,数值）
+sankey-beta
+income,savings,30
+income,food,20
+income,transport,10
+food,grocery,12
+food,delivery,8` },
+    { id: "req", name: "需求图", ico: "i-req", code:
+`requirementDiagram
+    requirement req_1 {
+        id: 1
+        text: "系统需支持秒级搜索"
+        risk: low
+        verifymethod: test
+    }
+    functionalRequirement f_req_1 {
+        id: 1.1
+        text: "搜索响应时间小于 1 秒"
+        risk: medium
+        verifymethod: test
+    }
+    element test_entity {
+        type: simulation
+    }
+    test_entity - satisfies -> f_req_1
+    f_req_1 - traces -> req_1` },
+    { id: "zen", name: "自定义笔记", ico: "i-note", code:
+`flowchart TD
+    title["在此输入你的主题"]
+    A["要点一"] --> A1["细节"]
+    B["要点二"] --> B1["细节"]
+    title --> A
+    title --> B
+    style title fill:#4f8cff,color:#fff,stroke:none` },
+  ]},
+];
+
+/* ---------- Mermaid 初始化 ---------- */
+mermaid.initialize({
+  startOnLoad: false,
+  securityLevel: "loose",
+  htmlLabels: false,
+  theme: state.theme === "dark" ? "dark" : "default",
+  flowchart: { curve: "basis", padding: 16 },
+  gantt: { fontSize: 13 },
+});
+
+/* ---------- 工具 ---------- */
+function toast(msg) {
+  $("#toastText").textContent = msg;
+  const t = $("#toast");
+  t.classList.add("show");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.remove("show"), 2200);
+}
+function saveDraft() {
+  if (state.mode === "diagram") localStorage.setItem("db_code_" + state.tplId, $("#codeEditor").value);
+  if (state.mode === "chart")   localStorage.setItem("db_chart", JSON.stringify({ type: state.chartType, title: $("#chartTitle").value, data: $("#chartData").value }));
+  if (state.mode === "gen")     ["genSteps","genMind","genTime","genSeq","genPie"].forEach(id => localStorage.setItem("db_" + id, $("#" + id).value));
+  toast("已保存到本地");
+}
+function loadDraft() {
+  if (state.mode === "diagram") {
+    const saved = localStorage.getItem("db_code_" + state.tplId);
+    if (saved !== null) $("#codeEditor").value = saved;
+    return saved !== null;
+  }
+  return false;
+}
+function icon(id, cls) { return `<svg class="${cls || "h-4 w-4"}"><use href="#${id}"/></svg>`; }
+
+/* ---------- 缩放 / 平移 ---------- */
+const wrap = $("#preview-wrap"), scroll = $("#previewScroll");
+function applyTransform() {
+  wrap.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+  $("#zoom-label").textContent = Math.round(state.zoom * 100) + "%";
+}
+function setZoom(z, cx, cy) {
+  const old = state.zoom;
+  z = Math.min(8, Math.max(0.1, z));
+  if (cx !== undefined) {
+    state.panX = cx - (cx - state.panX) * (z / old);
+    state.panY = cy - (cy - state.panY) * (z / old);
+  }
+  state.zoom = z;
+  applyTransform();
+}
+$("#zoomIn").onclick = () => setZoom(state.zoom * 1.25, scroll.clientWidth / 2, scroll.clientHeight / 2);
+$("#zoomOut").onclick = () => setZoom(state.zoom / 1.25, scroll.clientWidth / 2, scroll.clientHeight / 2);
+$("#zoomReset").onclick = () => { state.panX = 0; state.panY = 0; setZoom(1); };
+$("#zoomFit").onclick = () => {
+  const el = wrap.firstElementChild;
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (!r.width) return;
+  const z = Math.min(scroll.clientWidth / r.width, scroll.clientHeight / r.height, 3) * state.zoom;
+  state.panX = 0; state.panY = 0;
+  setZoom(z * 0.96);
+};
+scroll.addEventListener("wheel", e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const rect = scroll.getBoundingClientRect();
+  setZoom(state.zoom * (e.deltaY < 0 ? 1.12 : 0.89), e.clientX - rect.left, e.clientY - rect.top);
+}, { passive: false });
+let dragging = false, dx = 0, dy = 0;
+scroll.addEventListener("mousedown", e => {
+  if (e.target.closest("button")) return;
+  dragging = true; dx = e.clientX - state.panX; dy = e.clientY - state.panY;
+  scroll.style.cursor = "grabbing";
+});
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  state.panX = e.clientX - dx; state.panY = e.clientY - dy;
+  applyTransform();
+});
+window.addEventListener("mouseup", () => { dragging = false; scroll.style.cursor = ""; });
+
+/* ---------- 渲染（Mermaid） ---------- */
+let renderTimer = null, renderSeq = 0;
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(renderDiagram, 350);
+}
+async function renderDiagram() {
+  const code = $("#codeEditor").value;
+  const seq = ++renderSeq;
+  const errBox = $("#errBox");
+  if (!code.trim()) {
+    wrap.innerHTML = '<div class="flex h-40 items-center justify-center text-sm text-[var(--text-dim)]">输入内容后自动渲染…</div>';
+    return;
+  }
+  try {
+    const id = "mmd" + Date.now();
+    const { svg } = await mermaid.render(id, code);
+    if (seq !== renderSeq) return;
+    wrap.innerHTML = svg;
+    const el = wrap.querySelector("svg");
+    if (el) { el.style.maxWidth = "none"; el.removeAttribute("height"); }
+    state.lastSvg = el || null;
+    errBox.classList.add("hidden");
+    $("#statusBadge").classList.remove("hidden");
+    $("#renderInfo").textContent = "渲染成功";
+    setTimeout(() => $("#statusBadge").classList.add("hidden"), 1500);
+  } catch (err) {
+    if (seq !== renderSeq) return;
+    errBox.textContent = "语法错误：\n" + String(err.message || err);
+    errBox.classList.remove("hidden");
+    $("#renderInfo").textContent = "有错误";
+  }
+}
+
+/* ---------- 统计图表（Chart.js） ---------- */
+let chartInstance = null;
+const CHART_TYPES = [
+  { t: "bar", n: "柱状图", ico: "i-bar" },
+  { t: "barH", n: "条形图", ico: "i-bar-h" },
+  { t: "line", n: "折线图", ico: "i-line" },
+  { t: "area", n: "面积图", ico: "i-area" },
+  { t: "pie", n: "饼图", ico: "i-pie" },
+  { t: "doughnut", n: "环形图", ico: "i-doughnut" },
+  { t: "radar", n: "雷达图", ico: "i-radar" },
+  { t: "scatter", n: "散点图", ico: "i-scatter" },
+  { t: "polarArea", n: "极坐标", ico: "i-polar" },
+];
+const PALETTE = ["#4f8cff", "#b06cff", "#3ecf8e", "#ffb648", "#ff5c6c", "#2dd4bf", "#f472b6", "#94a3b8"];
+function sampleData(type) {
+  if (type === "scatter") return JSON.stringify({
+    datasets: [
+      { label: "实验组", data: [{x:1,y:12},{x:2,y:19},{x:3,y:8},{x:4,y:22},{x:5,y:17}] },
+      { label: "对照组", data: [{x:1,y:8},{x:2,y:11},{x:3,y:14},{x:4,y:9},{x:5,y:13}] },
+    ]
+  }, null, 2);
+  if (type === "radar") return JSON.stringify({
+    labels: ["沟通","技术","设计","管理","学习","抗压"],
+    datasets: [{ label: "张三", data: [80, 90, 60, 70, 85, 75] }, { label: "李四", data: [90, 70, 80, 65, 60, 88] }]
+  }, null, 2);
+  if (type === "pie" || type === "doughnut" || type === "polarArea") return JSON.stringify({
+    labels: ["已完成","进行中","待开始","已延期"],
+    datasets: [{ label: "任务", data: [42, 18, 25, 8] }]
+  }, null, 2);
+  return JSON.stringify({
+    labels: ["1月","2月","3月","4月","5月","6月"],
+    datasets: [{ label: "销售额（万元）", data: [32, 48, 41, 66, 78, 95] }, { label: "利润（万元）", data: [12, 18, 15, 26, 31, 40] }]
+  }, null, 2);
+}
+function isDark() { return state.theme === "dark"; }
+function chartGridColor() { return isDark() ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.08)"; }
+function chartTextColor() { return isDark() ? "#c8cfdd" : "#3a4358"; }
+
+function renderChart() {
+  const host = wrap.querySelector(".chart-host canvas");
+  if (host) host.remove();
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  let cfg;
+  try { cfg = JSON.parse($("#chartData").value); }
+  catch (e) {
+    $("#renderInfo").textContent = "JSON 格式错误";
+    return;
+  }
+  $("#renderInfo").textContent = "渲染成功";
+  wrap.innerHTML = '<div class="chart-host" style="padding:24px"><canvas id="statCanvas"></canvas></div>';
+  const canvas = $("#statCanvas");
+  const t = state.chartType === "barH" ? "bar" : state.chartType;
+  const opts = {
+    responsive: false,
+    plugins: {
+      title: { display: !!$("#chartTitle").value.trim(), text: $("#chartTitle").value.trim(), color: chartTextColor(), font: { size: 16, weight: "600" } },
+      legend: { labels: { color: chartTextColor() } },
+    },
+  };
+  if (["pie","doughnut","polarArea"].includes(t)) {
+    cfg.datasets.forEach(d => { d.backgroundColor = PALETTE; });
+  } else {
+    cfg.datasets.forEach((d, i) => {
+      if (!d.backgroundColor) d.backgroundColor = PALETTE[i % PALETTE.length] + "cc";
+      if (!d.borderColor) d.borderColor = PALETTE[i % PALETTE.length];
+    });
+    opts.scales = {
+      x: { ticks: { color: chartTextColor() }, grid: { color: chartGridColor() } },
+      y: { ticks: { color: chartTextColor() }, grid: { color: chartGridColor() } },
+    };
+  }
+  if (state.chartType === "barH") { opts.indexAxis = "y"; }
+  if (state.chartType === "area") {
+    cfg.datasets.forEach(d => { d.fill = true; d.backgroundColor = (d.borderColor || PALETTE[0]) + "44"; });
+  }
+  if (t === "radar" || t === "polarArea") {
+    cfg.datasets.forEach(d => { d.backgroundColor = (d.backgroundColor || PALETTE[0]) + "55"; d.borderWidth = 2; });
+  }
+  chartInstance = new Chart(canvas, { type: t, data: cfg, options: opts });
+  canvas.style.background = "var(--bg-panel)";
+  canvas.style.borderRadius = "12px";
+  canvas.style.boxShadow = "var(--shadow)";
+  canvas.width = 860; canvas.height = 540;
+  chartInstance.resize(860, 540);
+  state.lastSvg = null;
+}
+let chartTimer = null;
+function scheduleChart() { clearTimeout(chartTimer); chartTimer = setTimeout(renderChart, 400); }
+
+/* ---------- 模式切换 ---------- */
+function setMode(mode) {
+  state.mode = mode;
+  $$("#modeTabs button").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+  $("#codeEditor").classList.toggle("hidden", mode !== "diagram");
+  $("#chartForm").classList.toggle("hidden", mode !== "chart");
+  $("#genForms").classList.toggle("hidden", mode !== "gen");
+  document.body.classList.toggle("chart-mode", mode === "chart");
+  const sidebar = $("#sidebar");
+  sidebar.innerHTML = "";
+  if (mode === "diagram") {
+    $("#editorTitle").textContent = "Mermaid 代码";
+    $("#btnFormat").classList.remove("hidden");
+    buildTplSidebar();
+    if (!loadDraft()) setTemplate(state.tplId);
+    renderDiagram();
+  } else if (mode === "chart") {
+    $("#editorTitle").textContent = "数据与样式";
+    $("#btnFormat").classList.remove("hidden");
+    buildChartSidebar();
+    const saved = localStorage.getItem("db_chart");
+    if (saved) { try { const o = JSON.parse(saved); state.chartType = o.type || "bar"; $("#chartTitle").value = o.title || ""; $("#chartData").value = o.data || sampleData(state.chartType); } catch(e){} }
+    else { $("#chartTitle").value = "月度经营概览"; $("#chartData").value = sampleData(state.chartType); }
+    refreshChartGrid();
+    renderChart();
+  } else {
+    $("#editorTitle").textContent = "快速生成器";
+    $("#btnFormat").classList.add("hidden");
+    buildGenSidebar();
+    ["genSteps","genMind","genTime","genSeq","genPie"].forEach(id => {
+      const s = localStorage.getItem("db_" + id);
+      if (s !== null) $("#" + id).value = s;
+    });
+    wrap.innerHTML = '<div class="flex h-40 items-center justify-center text-sm text-[var(--text-dim)]">在左侧选择一种生成器，填入内容即可一键生成图形，并自动切换到「图表绘制」模式继续编辑与导出。</div>';
+    $("#renderInfo").textContent = "";
+  }
+}
+$$("#modeTabs button").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+
+/* ---------- 侧栏：图表模板 ---------- */
+function buildTplSidebar() {
+  const sb = $("#sidebar");
+  sb.innerHTML = "";
+  TEMPLATES.forEach(g => {
+    const h = document.createElement("div");
+    h.className = "side-h";
+    h.textContent = g.group;
+    sb.appendChild(h);
+    g.items.forEach(it => {
+      const d = document.createElement("div");
+      d.className = "tpl-item" + (it.id === state.tplId ? " active" : "");
+      d.innerHTML = icon(it.ico) + `<span>${it.name}</span>`;
+      d.onclick = () => setTemplate(it.id);
+      sb.appendChild(d);
+    });
+  });
+  const h2 = document.createElement("div");
+  h2.className = "side-h";
+  h2.textContent = "操作";
+  sb.appendChild(h2);
+  const loadBtn = document.createElement("div");
+  loadBtn.className = "tpl-item";
+  loadBtn.innerHTML = icon("i-upload") + '<span>导入 .mmd 文件</span>';
+  loadBtn.onclick = importMmd;
+  sb.appendChild(loadBtn);
+}
+function setTemplate(id) {
+  state.tplId = id;
+  let code = null;
+  TEMPLATES.forEach(g => g.items.forEach(it => { if (it.id === id) code = it.code; }));
+  const saved = localStorage.getItem("db_code_" + id);
+  $("#codeEditor").value = saved !== null ? saved : (code || "");
+  buildTplSidebar();
+  renderDiagram();
+}
+function importMmd() {
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".mmd,.txt,.mermaid";
+  inp.onchange = () => {
+    const f = inp.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { $("#codeEditor").value = r.result; state.tplId = "custom"; renderDiagram(); toast("已导入 " + f.name); };
+    r.readAsText(f, "utf-8");
+  };
+  inp.click();
+}
+
+/* ---------- 侧栏：统计图表 ---------- */
+function buildChartSidebar() {
+  const sb = $("#sidebar");
+  sb.innerHTML = '<div class="side-h">说明</div>';
+  const tip = document.createElement("div");
+  tip.className = "px-1.5 text-[11.5px] leading-relaxed text-[var(--text-dim)]";
+  tip.innerHTML = "选择图表类型 → 修改标题与 JSON 数据 → 预览区自动刷新。<br><br>labels：横轴分类或数据项名称<br>datasets：每个元素是一个系列（label + data）<br><br>散点图的数据格式为 <code class='rounded bg-[var(--bg-card)] px-1'>x,y</code> 数组，可直接参考示例修改。";
+  sb.appendChild(tip);
+}
+function refreshChartGrid() {
+  const grid = $("#chartTypeGrid");
+  grid.innerHTML = "";
+  CHART_TYPES.forEach(c => {
+    const d = document.createElement("div");
+    d.className = "ctype" + (c.t === state.chartType ? " active" : "");
+    d.innerHTML = icon(c.ico, "h-5 w-5") + `<span>${c.n}</span>`;
+    d.onclick = () => {
+      state.chartType = c.t;
+      $("#chartData").value = sampleData(c.t);
+      refreshChartGrid();
+      renderChart();
+    };
+    grid.appendChild(d);
+  });
+}
+$("#btnChartPreset").onclick = () => { $("#chartData").value = sampleData(state.chartType); renderChart(); };
+$("#chartData").addEventListener("input", scheduleChart);
+$("#chartTitle").addEventListener("input", scheduleChart);
+
+/* ---------- 侧栏：快速生成 ---------- */
+function buildGenSidebar() {
+  const sb = $("#sidebar");
+  sb.innerHTML = '<div class="side-h">生成器</div>';
+  const items = [
+    ["i-flow", "genSteps", "步骤 → 流程图"], ["i-mind", "genMind", "大纲 → 思维导图"],
+    ["i-timeline", "genTime", "时间 → 时间线"], ["i-seq", "genSeq", "角色 → 时序图"],
+    ["i-pie", "genPie", "数据 → 统计饼图"],
+  ];
+  items.forEach(([ico, fid, name]) => {
+    const d = document.createElement("div");
+    d.className = "tpl-item";
+    d.innerHTML = icon(ico) + `<span>${name}</span>`;
+    d.onclick = () => document.getElementById(fid).focus();
+    sb.appendChild(d);
+  });
+  const h = document.createElement("div");
+  h.className = "side-h";
+  h.textContent = "提示";
+  sb.appendChild(h);
+  const tip = document.createElement("div");
+  tip.className = "px-1.5 text-[11.5px] leading-relaxed text-[var(--text-dim)]";
+  tip.textContent = "生成后会自动切到「图表绘制」模式，可继续手工微调 Mermaid 代码并导出图片。";
+  sb.appendChild(tip);
+}
+
+/* ---------- 快速生成器 ---------- */
+function escapeLabel(s) { return s.replace(/"/g, "'").trim(); }
+function genFromCode(code, tplName) {
+  state.tplId = "custom";
+  localStorage.setItem("db_code_custom", code);
+  setMode("diagram");
+  $("#codeEditor").value = code;
+  renderDiagram();
+  toast("已生成" + tplName + "，可继续编辑");
+}
+/* 步骤 → 流程图 */
+$("#btnGenFlow").onclick = () => {
+  const lines = $("#genSteps").value.split("\n").map(l => l.replace(/\t/g, "  "));
+  const out = ["flowchart TD"];
+  let idN = 0; const id = () => "N" + (++idN);
+  let prev = null, decisionStack = [];
+  lines.forEach(raw => {
+    if (!raw.trim()) return;
+    const isDecision = raw.trim().startsWith("#");
+    const indent = raw.length - raw.trimStart().length;
+    const label = escapeLabel(raw.trim().replace(/^#\s*/, ""));
+    const node = id();
+    if (isDecision) {
+      out.push(`    ${node}{"${label}"}`);
+      decisionStack.push({ node, branchUsed: false, indent });
+      if (prev) { out.push(`    ${prev} --> ${node}`); prev = null; }
+      return;
+    }
+    if (decisionStack.length && indent >= 2 && !prev) {
+      const d = decisionStack[decisionStack.length - 1];
+      out.push(`    ${node}["${label}"]`);
+      out.push(`    ${d.node} -->|分支${d.branchUsed ? "二" : "一"}| ${node}`);
+      d.branchUsed = true;
+      prev = node;
+    } else {
+      out.push(`    ${node}["${label}"]`);
+      if (prev) out.push(`    ${prev} --> ${node}`);
+      while (decisionStack.length && indent < decisionStack[decisionStack.length-1].indent + 2 && decisionStack[decisionStack.length-1].branchUsed) decisionStack.pop();
+      prev = node;
+    }
+  });
+  genFromCode(out.join("\n"), "流程图");
+};
+/* 大纲 → 思维导图 */
+$("#btnGenMind").onclick = () => {
+  const shapes = { "圆角": "((", "方形": ")", "圆形": "(((", "云朵": ")}}" };
+  const lines = $("#genMind").value.split("\n").filter(l => l.trim());
+  if (!lines.length) return toast("请先输入大纲");
+  const shape = shapes[$("#mindShape").value.trim()] || "((";
+  const close = { "((":"))", ")":")", "(((":")))", ")}}":"{{" }[shape];
+  const out = ["mindmap"];
+  out.push("  root" + shape + escapeLabel(lines[0]) + close);
+  lines.slice(1).forEach(raw => {
+    const expand = t => t.replace(/\t/g, "  ");
+    const l = expand(raw);
+    const indent = l.length - l.trimStart().length;
+    const level = Math.floor(indent / 2) + 2;
+    out.push(" ".repeat(level * 2) + escapeLabel(l.trim()));
+  });
+  genFromCode(out.join("\n"), "思维导图");
+};
+/* 时间线 */
+$("#btnGenTime").onclick = () => {
+  const lines = $("#genTime").value.split("\n").filter(l => l.trim());
+  const out = ["timeline", "    title 时间线"];
+  lines.forEach(l => {
+    const parts = l.split(":").map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    out.push("    " + parts[0] + " : " + parts.slice(1).join(" : "));
+  });
+  genFromCode(out.join("\n"), "时间线");
+};
+/* 时序图 */
+$("#btnGenSeq").onclick = () => {
+  const lines = $("#genSeq").value.split("\n").filter(l => l.trim());
+  const out = ["sequenceDiagram", "    autonumber"];
+  const actors = new Set();
+  lines.forEach(l => {
+    if (/^participant\b/.test(l.trim())) { out.push("    " + l.trim()); return; }
+    const m = l.match(/^(.+?)\s*(-->>|->>|-->|->|--)\s*:\s*(.+)$/);
+    if (!m) return;
+    const [, a, arrow, b, msg] = m;
+    [a, b].forEach(x => {
+      const name = x.trim();
+      if (name && !actors.has(name)) {
+        actors.add(name);
+        out.push(`    actor ${name} as ${name}`);
+      }
+    });
+    out.push(`    ${a.trim()}${arrow}${b.trim()} : ${msg.trim()}`);
+  });
+  genFromCode(out.join("\n"), "时序图");
+};
+/* 饼图 */
+$("#btnGenPie").onclick = () => {
+  const lines = $("#genPie").value.split("\n").filter(l => l.trim());
+  const out = ["pie showData", "    title 数据占比"];
+  lines.forEach(l => {
+    const i = l.lastIndexOf(":");
+    if (i < 0) return;
+    const name = l.slice(0, i).trim(), val = l.slice(i + 1).trim();
+    if (name && val) out.push(`    "${name}" : ${val}`);
+  });
+  genFromCode(out.join("\n"), "饼图");
+};
+
+/* ---------- 导出 ---------- */
+function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+}
+function svgToPng(svgEl, scale = 3) {
+  return new Promise((resolve, reject) => {
+    const clone = svgEl.cloneNode(true);
+    const vb = (svgEl.getAttribute("viewBox") || "").split(/[\s,]+/).map(Number);
+    let w = parseFloat(svgEl.getAttribute("width")) || vb[2] || 800;
+    let h = parseFloat(svgEl.getAttribute("height")) || vb[3] || 600;
+    if (vb.length === 4 && vb[2] && vb[3]) { w = vb[2]; h = vb[3]; }
+    clone.setAttribute("width", w); clone.setAttribute("height", h);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const xml = new XMLSerializer().serializeToString(clone);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = w * scale; canvas.height = h * scale;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = isDark() ? "#12141a" : "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(b => resolve(b), "image/png");
+    };
+    img.onerror = reject;
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(xml);
+  });
+}
+async function exportPng() {
+  if (state.mode === "chart") {
+    if (!chartInstance) return toast("暂无可导出的图表");
+    const bg = isDark() ? "#12141a" : "#ffffff";
+    const c2 = document.createElement("canvas");
+    c2.width = chartInstance.canvas.width; c2.height = chartInstance.canvas.height;
+    const ctx = c2.getContext("2d");
+    ctx.fillStyle = bg; ctx.fillRect(0, 0, c2.width, c2.height);
+    ctx.drawImage(chartInstance.canvas, 0, 0);
+    c2.toBlob(b => { download(b, "统计图表.png"); toast("PNG 已导出"); });
+    return;
+  }
+  const svg = wrap.querySelector("svg");
+  if (!svg) return toast("暂无可导出的图形");
+  try {
+    const blob = await svgToPng(svg);
+    download(blob, "图形导出.png");
+    toast("PNG 已导出");
+  } catch (e) { toast("导出失败：" + e.message); }
+}
+function exportSvg() {
+  const svg = wrap.querySelector("svg");
+  if (!svg) return toast("SVG 仅支持图表模式导出");
+  const clone = svg.cloneNode(true);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  download(new Blob([new XMLSerializer().serializeToString(clone)], { type: "image/svg+xml" }), "图形导出.svg");
+  toast("SVG 已导出");
+}
+$("#btnPng").onclick = exportPng;
+$("#btnSvg").onclick = exportSvg;
+
+/* ---------- 导出 README ---------- */
+const FENCE = "\u0060\u0060\u0060";
+function mdEscapeCell(s) { return String(s).replace(/\|/g, "\\|").replace(/\n/g, " "); }
+function exportReadme() {
+  const today = new Date().toLocaleDateString("zh-CN");
+  let md = "", filename = "README.md";
+  if (state.mode === "diagram") {
+    const code = $("#codeEditor").value.trim();
+    if (!code) return toast("暂无可导出的图形代码");
+    const tm = code.match(/^\s*title\s+"?([^"\n]+?)"?\s*$/m);
+    const title = tm ? tm[1].trim() : "图形文档";
+    md += "# " + title + "\n\n"
+       + "> 由 DrawBuddy 生成 · " + today + "\n\n"
+       + "GitHub / Gitee / Typora 等平台可原生渲染以下 Mermaid 代码块。\n\n"
+       + FENCE + "mermaid\n" + code + "\n" + FENCE + "\n\n"
+       + "<!-- 如需图片版本：在 DrawBuddy 中导出 PNG 或 SVG，与本 README 放在同一目录后取消下行注释 -->\n"
+       + "<!-- ![](./" + encodeURIComponent(title) + ".png) -->\n";
+  } else if (state.mode === "chart") {
+    const title = $("#chartTitle").value.trim() || "统计图表";
+    md += "# " + title + "\n\n"
+       + "> 由 DrawBuddy 生成 · " + today + "\n\n";
+    try {
+      const cfg = JSON.parse($("#chartData").value);
+      const typeNames = Object.fromEntries(CHART_TYPES.map(c => [c.t, c.n]));
+      md += "- 图表类型：" + (typeNames[state.chartType] || state.chartType) + "\n\n";
+      if (state.chartType === "scatter") {
+        md += cfg.datasets.map(d => {
+          const rows = d.data.map(p => "| " + mdEscapeCell(p.x) + " | " + mdEscapeCell(p.y) + " |").join("\n");
+          return "**" + mdEscapeCell(d.label || "系列") + "**\n\n| x | y |\n| --- | --- |\n" + rows;
+        }).join("\n\n") + "\n";
+      } else {
+        const labels = (cfg.labels || []).map(mdEscapeCell);
+        md += "| " + ["数据项", ...cfg.datasets.map(d => mdEscapeCell(d.label || "系列"))].join(" | ") + " |\n"
+           + "| " + ["---", ...cfg.datasets.map(() => "---:")].join(" | ") + " |\n";
+        labels.forEach((lb, i) => {
+          md += "| " + lb + " | " + cfg.datasets.map(d => d.data[i] ?? "").join(" | ") + " |\n";
+        });
+      }
+    } catch (e) {
+      md += "> 数据 JSON 解析失败，未能生成数据表格。\n\n" + FENCE + "json\n" + $("#chartData").value + "\n" + FENCE + "\n";
+    }
+    md += "\n<!-- 如需图片版本：在 DrawBuddy 中导出 PNG，与本 README 放在同一目录后取消下行注释 -->\n"
+       + "<!-- ![](./" + encodeURIComponent(title) + ".png) -->\n";
+  } else {
+    return toast("请先生成图形，再在「图表绘制」或「统计图表」模式导出 README");
+  }
+  download(new Blob([md], { type: "text/markdown;charset=utf-8" }), filename);
+  toast("README.md 已导出");
+}
+$("#btnMd").onclick = exportReadme;
+$("#btnFormat").onclick = () => {
+  if (state.mode === "diagram") {
+    localStorage.removeItem("db_code_" + state.tplId);
+    setTemplate(state.tplId);
+    toast("已恢复模板");
+  } else if (state.mode === "chart") {
+    $("#chartData").value = sampleData(state.chartType);
+    renderChart();
+  }
+};
+
+/* ---------- 主题 ---------- */
+function applyThemeIcon() {
+  $("#btnTheme").innerHTML = icon(state.theme === "dark" ? "i-moon" : "i-sun");
+}
+$("#btnTheme").onclick = () => {
+  state.theme = state.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("db_theme", state.theme);
+  document.documentElement.dataset.theme = state.theme;
+  applyThemeIcon();
+  mermaid.initialize({
+    startOnLoad: false, securityLevel: "loose", htmlLabels: false,
+    theme: state.theme === "dark" ? "dark" : "default",
+    flowchart: { curve: "basis", padding: 16 }, gantt: { fontSize: 13 },
+  });
+  if (state.mode === "diagram") renderDiagram();
+  if (state.mode === "chart") renderChart();
+};
+applyThemeIcon();
+
+/* ---------- 编辑器事件 ---------- */
+$("#codeEditor").addEventListener("input", scheduleRender);
+document.addEventListener("keydown", e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); state.mode === "chart" ? renderChart() : renderDiagram(); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveDraft(); }
+});
+$("#genForms").addEventListener("input", e => {
+  if (e.target.tagName === "TEXTAREA") localStorage.setItem("db_" + e.target.id, e.target.value);
+});
+
+/* ---------- 启动 ---------- */
+setMode("diagram");
+</script>
+</body>
+</html>
